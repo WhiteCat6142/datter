@@ -2,3 +2,5 @@ src/
 pkg/
 .vscode/
 index.exe
+x.json
+index.html

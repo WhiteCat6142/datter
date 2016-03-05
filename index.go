@@ -2,7 +2,7 @@ package main
 
 import (
     "encoding/json"
-    "fmt"
+    //"fmt"
     "net/http"
     "io/ioutil"
     "strings"
@@ -11,12 +11,13 @@ import (
     "os"
     "golang.org/x/text/encoding/japanese"
     "golang.org/x/text/transform"
+    "html/template"
 )
 
 type dat struct {
-    Records  int64
+    Records  int
     Sub   string
-    Dat int64
+    Dat int
 }
 type data struct{
     Url string
@@ -28,6 +29,7 @@ type record struct{
     Num string
 }
 
+
 func main() {
     buf, _ := ioutil.ReadFile("x.json")
     var d []data
@@ -35,6 +37,7 @@ func main() {
     newR:=[]record{}
     
     re := regexp.MustCompile("(\\d+)\\.dat<>(.*) \\((\\d+)\\)")
+    reurl := regexp.MustCompile("^(https?://.+/)(.*)/$")
     //next:=new([]data)
     for i, value := range d {
         x:= []dat{}
@@ -42,34 +45,44 @@ func main() {
         for _, l := range hRead(value.Url+"subject.txt") {
             s:=re.FindStringSubmatch(l)
             if(s==nil){break}
-            n:=new(dat)
-            n.Records=parse(s[3])
-            n.Sub=s[2]
-            n.Dat=parse(s[1])
-            x=append(x,*n)
+            n:=dat{parse(s[3]),s[2],parse(s[1])}
+            x=append(x,n)
+            f:=true
             for _,ll := range old{
-                if((ll.Sub==n.Sub)&&(ll.Dat==n.Dat)){
+                if((ll.Dat==n.Dat)&&(ll.Sub==n.Sub)){
                    if(ll.Records<n.Records){
                     r:=new(record)
-                    r.Url=value.Url+strconv.FormatInt(n.Dat, 10)+"/"
+                    r.Url=value.Url+strconv.Itoa(n.Dat)+"/"
                     r.Sub=ll.Sub
-                    r.Num=strconv.FormatInt(ll.Records, 10)+"-"+strconv.FormatInt(n.Records, 10)
+                    r.Num=strconv.Itoa(ll.Records)+"-"+strconv.Itoa(n.Records)
                     newR=append(newR,*r)
                    }
+                   f=false
                    break
                 }
+            }
+            if(f){
+                    r:=new(record)
+                    s0:=reurl.FindStringSubmatch(value.Url)
+                    r.Url=s0[1]+"test/read.cgi"+s0[2]+"/"+strconv.Itoa(n.Dat)+"/"
+                    r.Sub=n.Sub
+                    r.Num="0-"+strconv.Itoa(n.Records)
+                    newR=append(newR,*r)
             }
         }
         d[i].X=x
     }
     
-    fmt.Printf("%+v\n", newR)
-    result , _ :=json.Marshal(d)
+  tmpl, err := template.New("master").Parse("<html><head></head><body>{{range .}}<a href= \"{{ .Url }}\">{{ .Sub }}({{ .Num}})</a>{{end}}</body></html>")
+  if err != nil {panic(err)}
+  err = tmpl.Execute(os.Stdout, newR)
+    //fmt.Printf("%+v\n", newR)
+    result , _ :=json.MarshalIndent(d,"","  ")
     ioutil.WriteFile("x.json", result, os.ModePerm)
 }
 
-func parse(str string) int64 {
-    r,_:=strconv.ParseInt(str, 10, 32)
+func parse(str string) int {
+    r,_:=strconv.Atoi(str)
     return r
 }
 
