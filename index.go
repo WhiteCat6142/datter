@@ -52,7 +52,8 @@ func main() {
                 if((ll.Dat==n.Dat)&&(ll.Sub==n.Sub)){
                    if(ll.Records<n.Records){
                     r:=new(record)
-                    r.Url=value.Url+strconv.Itoa(n.Dat)+"/"
+                    s0:=reurl.FindStringSubmatch(value.Url)
+                    r.Url=s0[1]+"test/read.cgi/"+s0[2]+"/"+strconv.Itoa(n.Dat)+"/"
                     r.Sub=ll.Sub
                     r.Num=strconv.Itoa(ll.Records)+"-"+strconv.Itoa(n.Records)
                     newR=append(newR,*r)
@@ -64,7 +65,7 @@ func main() {
             if(f){
                     r:=new(record)
                     s0:=reurl.FindStringSubmatch(value.Url)
-                    r.Url=s0[1]+"test/read.cgi"+s0[2]+"/"+strconv.Itoa(n.Dat)+"/"
+                    r.Url=s0[1]+"test/read.cgi/"+s0[2]+"/"+strconv.Itoa(n.Dat)+"/"
                     r.Sub=n.Sub
                     r.Num="0-"+strconv.Itoa(n.Records)
                     newR=append(newR,*r)
