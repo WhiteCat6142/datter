@@ -40,11 +40,13 @@ func main() {
 	reurl := regexp.MustCompile("^(https?://.+/)(.*)/$")
 	//next:=new([]data)
 	wg := new(sync.WaitGroup)
-	for ii, value := range d {
+    li:= []chan []dat{}
+	for i, value := range d {
 		wg.Add(1)
-		go func(i int) {
+        myChan := make(chan []dat,1)
+        li=append(li,myChan)
+		go func(value data,c chan []dat,old []dat) {
             x := []dat{}
-            old := d[i].X
 			for _, l := range hRead(value.Url + "subject.txt") {
 				s := re.FindStringSubmatch(l)
 				if s == nil {
@@ -76,12 +78,14 @@ func main() {
 					newR = append(newR, *r)
 				}
 			}
-            d[i].X = x
-            fmt.Println(i)
+            c <- x
 			wg.Done()
-		}(ii)
+		}(value,myChan,d[i].X)
 	}
 	wg.Wait()
+    for i,c := range li{
+        d[i].X= <-c
+    }
 	tmpl, err := template.New("master").Parse("<html><head></head><body>{{range .}}<a href= \"{{ .Url }}\">{{ .Sub }}({{ .Num}})</a>{{end}}</body></html>")
 	if err != nil {
 		panic(err)
