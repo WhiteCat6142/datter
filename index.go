@@ -40,9 +40,9 @@ func main() {
 	reurl := regexp.MustCompile("^(https?://.+/)(.*)/$")
 	//next:=new([]data)
 	wg := new(sync.WaitGroup)
-	for i, value := range d {
+	for ii, value := range d {
 		wg.Add(1)
-		go func() {
+		go func(i int) {
             x := []dat{}
             old := d[i].X
 			for _, l := range hRead(value.Url + "subject.txt") {
@@ -77,8 +77,9 @@ func main() {
 				}
 			}
             d[i].X = x
+            fmt.Println(i)
 			wg.Done()
-		}()
+		}(ii)
 	}
 	wg.Wait()
 	tmpl, err := template.New("master").Parse("<html><head></head><body>{{range .}}<a href= \"{{ .Url }}\">{{ .Sub }}({{ .Num}})</a>{{end}}</body></html>")
