@@ -34,19 +34,16 @@ func main() {
 	buf, _ := ioutil.ReadFile("x.json")
 	var d []data
 	json.Unmarshal(buf, &d)
-	newR := []record{}
+	newR := make(chan record)
 
 	re := regexp.MustCompile("(\\d+)\\.dat<>(.*) \\((\\d+)\\)")
-	reurl := regexp.MustCompile("^(https?://.+/)(.*)/$")
-	//next:=new([]data)
 	wg := new(sync.WaitGroup)
-    li:= []chan []dat{}
-	for i, value := range d {
+	for ii, value := range d {
 		wg.Add(1)
-        myChan := make(chan []dat,1)
-        li=append(li,myChan)
-		go func(value data,c chan []dat,old []dat) {
-            x := []dat{}
+		go func(value data, i int) {
+            defer wg.Done()
+			x := []dat{}
+			old := d[i].X
 			for _, l := range hRead(value.Url + "subject.txt") {
 				s := re.FindStringSubmatch(l)
 				if s == nil {
@@ -56,46 +53,34 @@ func main() {
 				x = append(x, n)
 				f := true
 				for _, ll := range old {
-					if (ll.Dat == n.Dat) && (ll.Sub == n.Sub) {
+					if ll.Dat == n.Dat {
 						if ll.Records < n.Records {
-							r := new(record)
-							s0 := reurl.FindStringSubmatch(value.Url)
-							r.Url = s0[1] + "test/read.cgi/" + s0[2] + "/" + strconv.Itoa(n.Dat) + "/"
-							r.Sub = ll.Sub
-							r.Num = strconv.Itoa(ll.Records) + "-" + strconv.Itoa(n.Records)
-							newR = append(newR, *r)
+							newR <- nr(value, n, ll.Records)
 						}
 						f = false
 						break
 					}
 				}
 				if f {
-					r := new(record)
-					s0 := reurl.FindStringSubmatch(value.Url)
-					r.Url = s0[1] + "test/read.cgi/" + s0[2] + "/" + strconv.Itoa(n.Dat) + "/"
-					r.Sub = n.Sub
-					r.Num = "0-" + strconv.Itoa(n.Records)
-					newR = append(newR, *r)
+					newR <- nr(value, n, 0)
 				}
 			}
-            c <- x
-			wg.Done()
-		}(value,myChan,d[i].X)
+			d[i].X = x
+		}(value, ii)
 	}
 	wg.Wait()
-    for i,c := range li{
-        d[i].X= <-c
-    }
-	tmpl, err := template.New("master").Parse("<html><head></head><body>{{range .}}<a href= \"{{ .Url }}\">{{ .Sub }}({{ .Num}})</a>{{end}}</body></html>")
-	if err != nil {
-		panic(err)
+	close(newR)
+	rs := []record{}
+	for r := range newR {
+		rs = append(rs, r)
 	}
-    f, err2 := os.OpenFile("index.html", os.O_WRONLY|os.O_CREATE|os.O_TRUNC, os.ModePerm)
-    if err2 != nil {
+	tmpl, _ := template.New("master").Parse("<html><head></head><body>{{range .}}<a href= \"{{ .Url }}\">{{ .Sub }}({{ .Num}})</a>{{end}}</body></html>")
+	f, err2 := os.OpenFile("index.html", os.O_WRONLY|os.O_CREATE|os.O_TRUNC, os.ModePerm)
+    defer f.Close()
+	if err2 != nil {
 		panic(err2)
 	}
-    err = tmpl.Execute(f, newR)
-    err = f.Close()
+	_ = tmpl.Execute(f, rs)
 	//fmt.Printf("%+v\n", newR)
 	result, _ := json.MarshalIndent(d, "", "  ")
 	ioutil.WriteFile("x.json", result, os.ModePerm)
@@ -108,19 +93,25 @@ func parse(str string) int {
 
 func hRead(url string) []string {
 	resp, err := http.Get(url)
+    defer resp.Body.Close()
 	if err != nil {
-        fmt.Print(err)
+		fmt.Print(err)
 		return nil
 	}
-	defer resp.Body.Close()
 	res := transform.NewReader(resp.Body, japanese.ShiftJIS.NewDecoder())
 	b, err2 := ioutil.ReadAll(res)
-	if err2 == nil {
-		return strings.Split(string(b), "\n")
+	if err2 != nil {
+		return nil
 	}
-	return nil
+	return strings.Split(string(b), "\n")
 }
 
-/*func ayncmap(arr A[],f func){
-
-}*/
+var reurl = regexp.MustCompile("^(https?://.+/)(.*)/$")
+func nr(value data, n dat, l int) record {
+	r := new(record)
+	s0 := reurl.FindStringSubmatch(value.Url)
+	r.Url = s0[1] + "test/read.cgi/" + s0[2] + "/" + strconv.Itoa(n.Dat) + "/"
+	r.Sub = n.Sub
+    r.Num = strconv.Itoa(l) + "-" + strconv.Itoa(n.Records)
+	return *r
+}
